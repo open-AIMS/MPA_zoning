@@ -24,12 +24,13 @@ library(png)
 library(stringr)
 library(ggtext)
 library(magick)
+library(patchwork)
 source('helperFunctions.R')
 
 ## ---- settings
 purpose <- 'Reports' #'Web' #'Reports'
 sector <- 'All' #'Cairns' #'All'
-PNG <- FALSE
+PNG <- TRUE
 MAX_REPORT_YEAR <- 2024
 report_year <- 2024
 sec <- "All"
@@ -126,8 +127,8 @@ alternative_group_names = tribble(
 )
 
 img2 <- img <- vector('list', length(alternative_group_names$Image))
-for (i in 1:length(img)) img2[[i]] <- rasterGrob(magick::image_read(paste0('data/',alternative_group_names$Image[i])) %>% magick::image_flop(), interpolate=TRUE)
-for (i in 1:length(img)) img[[i]] <- rasterGrob(readPNG(source=paste0('data/',alternative_group_names$Image[i])), interpolate=TRUE)
+for (i in 1:length(img)) img2[[i]] <- rasterGrob(magick::image_read(paste0(params_path, '/',alternative_group_names$Image[i])) %>% magick::image_flop(), interpolate=TRUE)
+for (i in 1:length(img)) img[[i]] <- rasterGrob(readPNG(source=paste0(params_path, '/',alternative_group_names$Image[i])), interpolate=TRUE)
 
 ## cm.abund <- do.call('rbind', cm.all[seq(1,length(cm.all),by=3)]) %>% mutate(Group=rownames(.)) %>%
 cm.abund <- do.call('rbind', cm.larger[seq(1,length(cm.larger),by=3)]) %>% mutate(Group=rownames(.)) %>%
