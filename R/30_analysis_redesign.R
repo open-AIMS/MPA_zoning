@@ -35,9 +35,6 @@ sec <- "All"
 MPA_create_paths(purpose, report_year)
 ## ----end
 
-load(file = paste0(processed_data_path, "/labels.RData"))
-load(file = paste0(processed_data_path, "/data.RData"))
-
 ########################################################################
 ## Load the extracted data and make a slight change to one field name ##
 ########################################################################
@@ -117,8 +114,8 @@ benthos.site <- MPA_siteAgg(benthos)
 ##################################################
 data = fish.site %>% bind_rows(benthos.site) %>% as.data.frame
 ## data = fish %>% bind_rows(benthos) %>% as.data.frame
-if (purpose=='Reports') save(data, file='data/reports.data_design_influence.RData')
-if (purpose=='Web') save(data, file='data/web.data_design_influence.RData')
+if (purpose=='Reports') save(data, file = paste0(processed_data_path, '/reports.data_design_influence.RData'))
+if (purpose=='Web') save(data, file = paste0(processed_data_path, '/web.data_design_influence.RData'))
 
 ###################################################################
 ## Generate a model safe version of Year that can be used in     ##
@@ -143,8 +140,8 @@ if (purpose=='Web' & sector!='All') {
 labels=MPA_makeLabels(type=purpose)
 titles=MPA_makeTitles(type=purpose) 
 
-save(data, file='data/data_design_influence.RData')
-load(file='data/data_design_influence.RData')
+save(data, file=paste0(processed_data_path, '/data_design_influence.RData'))
+load(file=paste0(processed_data_path, '/data_design_influence.RData'))
 
 ##########################################################
 ## Run the analyses, looping through each of the Groups ##
@@ -153,7 +150,7 @@ load(file='data/data_design_influence.RData')
 cm <- vector('list', length=length(names(labels)))
 names(cm) <- names(labels)
 cm.inla <- cm.all <- cm.all.year <- cm.gam <- cm
-model.settings <- read.table(file='parameters/model.settings.txt',
+model.settings <- read.table(file=paste0(params_path, '/model.settings.txt'),
                              header=TRUE,sep=',', strip.white=TRUE)
 j = 0
 for (i in names(labels)) {  
@@ -166,7 +163,7 @@ for (i in names(labels)) {
     cm[[i]] <- cellmeans
     cellmeans <- MPA_sector_levels4plotting(cellmeans)
     p = MPA_RAPPlot(cellmeans, ytitle=labels[[i]], title=titles[[i]], stat='mean',purpose=purpose)
-    MPA_SAVE_PLOTS(p, filename = paste0('figures/',purpose,'/RAPPlot_',i,'_',sec,'_raw_design_influence'), PNG = FALSE)
+    MPA_SAVE_PLOTS(p, filename = paste0(fig_path, '/RAPPlot_',i,'_',sec,'_raw_design_influence'), PNG = FALSE)
     
     cat('### Fit INLA model\n')
     ## Exclude Sector/Year/Zone combinations that have no fish (not
@@ -223,8 +220,8 @@ for (i in names(labels)) {
                        inla.form = inla.form,
                        fam=as.character(ms[,'INLA.family']),
                        link=as.character(ms[,'INLA.link']))
-    save(dat.inla, file=paste0('data/dat.inla_',i,'_',sec,'_design_influence.RData'))
-    load(file=paste0('data/dat.inla_',i,'_',sec,'_design_influence.RData'))
+    save(dat.inla, file=paste0(modelled_data_path, '/dat.inla_',i,'_',sec,'_design_influence.RData'))
+    load(file=paste0(modelled_data_path, '/dat.inla_',i,'_',sec,'_design_influence.RData'))
 
     cat('### Estimate cellmeans and effects\n')
     data.mod <- dat.mod
@@ -238,16 +235,16 @@ for (i in names(labels)) {
     cellmeans.inla[[1]] <- MPA_sector_levels4plotting(cellmeans.inla[[1]])
     cellmeans.inla[[1]] <- cellmeans.inla[[1]] %>% filter(Sector != 'Cooktown-Lizard') %>% droplevels()
     p=MPA_RAPPlot(cellmeans.inla[[1]], ytitle=labels[[i]], title=titles[[i]],purpose=purpose)
-    ggsave(filename=paste0('figures/',purpose,'/RAPPlot_',i,'_',sec,'_inla_design_influence.pdf'), p,width=10, height=6)
+    ggsave(filename=paste0(modelled_data_path, '/RAPPlot_',i,'_',sec,'_inla_design_influence.pdf'), p,width=10, height=6)
 
     cm.all[[i]] <- cellmeans.inla$effects_overall %>% 
         mutate(Group=i)
 }
 
-save(cm.inla, file='data/cm.inla_design_influence.RData')
-save(cm.all, file='data/cm.all_design_influence.RData')
-load(file='data/cm.all_design_influnce.RData')
-load(file='data/cm.inla_design_influence.RData')
+save(cm.inla, file=paste0(modelled_data_path, '/cm.inla_design_influence.RData'))
+save(cm.all, file=paste0(modelled_data_path, '/cm.all_design_influence.RData'))
+load(file=paste0(modelled_data_path, '/cm.all_design_influence.RData'))
+load(file=paste0(modelled_data_path, '/cm.inla_design_influence.RData'))
 
 ## The compilation plots are generated in summary.R
 
