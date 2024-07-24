@@ -1,0 +1,47 @@
+Group,                     INLA.family,            INLA.link,   stan.family,                           gam.family, gam.link             
+Coral Trout Biomass,       hurdlegamma,            log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Coral Trout,               zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log  
+Coral Trout Length,        gamma,                  log,         Gamma(link='log'),                     Gamma,      log
+Secondary targets Biomass, hurdlegamma, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Secondary targets,         zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log  
+Secondary targets Length,  gamma,                  log,         Gamma(link='log'),                     Gamma,      log
+Scrapers,                  zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Croppers,                  zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Farmers,                   zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Planktivores,              zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log  
+Detritivores,              zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Benthic foragers,          zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Excavators,                zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Obligate corallivores,     zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Omnivorous Pomacentridae,  zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+Species Richness,          zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+A,                         beta,                   logit,       Beta(link='logit'),                    betar,      logit
+HC,                        beta,                   logit,       Beta(link='logit'),                    betar,      logit
+SC,                        beta,                   logit,       Beta(link='logit'),                    betar,      logit
+
+large,                     zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log
+small,                     zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+total,                     zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+trout,                     zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log 
+herbivores,                zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log', tw,         log)
+secondary_targets,         zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), tw,         log
+Labridae (Wrasses) Biomass, hurdlegamma, log,         zero_inflated_negbinomial(link='log'), tw,         log
+Lethrinidae (Emperors) Biomass, hurdlegamma, log,         zero_inflated_negbinomial(link='log'), tw,         log
+Lethrinus miniatus and L. nebulosus (Redthroat and Spangled emperors) Biomass, hurdlegamma, log,         zero_inflated_negbinomial(link='log'), tw,         log
+Lutjanidae (Tropical Snappers) Biomass, hurdlegamma, log,         zero_inflated_negbinomial(link='log'), tw,         log
+Plectropomus and Variola spp (Coral trout) Biomass, hurdlegamma, log,         zero_inflated_negbinomial(link='log'), tw,         log
+Serranidae (Rockcods) Biomass, hurdlegamma, log,         zero_inflated_negbinomial(link='log'), tw,         log
+
+Labridae (Wrasses) Length,        gamma, log,         Gamma(link='log'), Gamma,         log
+Lethrinidae (Emperors) Length,    gamma, log,         Gamma(link='log'), Gamma,         log
+Lethrinus miniatus and L. nebulosus (Redthroat and Spangled emperors) Length,    gamma, log,         Gamma(link='log'), Gamma,         log
+Lutjanidae (Tropical Snappers) Length,    gamma, log,         Gamma(link='log'), Gamma,         log
+Plectropomus and Variola spp (Coral trout) Length,    gamma, log,         Gamma(link='log'), Gamma,         log
+Serranidae (Rockcods) Length,        gamma, log,         Gamma(link='log'), Gamma,         log
+
+Labridae (Wrasses),        zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), nb,         log
+Lethrinidae (Emperors), zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), nb,         log
+Lethrinus miniatus and L. nebulosus (Redthroat and Spangled emperors), zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), nb,         log
+Lutjanidae (Tropical Snappers), zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), nb,         log
+Plectropomus and Variola spp (Coral trout), zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), nb,         log
+Serranidae (Rockcods), zeroinflatednbinomial1, log,         zero_inflated_negbinomial(link='log'), nb,         log

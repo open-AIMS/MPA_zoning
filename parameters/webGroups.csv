@@ -1,0 +1,7 @@
+Group;             Families
+large;             "FAMILY %in% c('Acanthuridae','Chaetodontidae','Labridae','Lethrinidae','Lutjandae','Scaridae','Serranidae','Siganidae','Zanclidae')"
+small;             "FAMILY %in% c('Pomacentridae')"
+total;             "FAMILY %in% c('Acanthuridae','Chaetodontidae','Labridae','Lethrinidae','Lutjandae','Pomacentridae','Scaridae','Serranidae','Siganidae','Zanclidae')"
+trout;             "grepl('(^PMS.*|^VAR.*)', FISH_CODE)"
+herbivores;        "FAMILY %in% c('Acanthuridae','Scaridae','Siganidae')"
+secondary_targets; "FAMILY %in% c('Labridae','Lethrinidae','Lutjandae')"
