@@ -161,7 +161,7 @@ for (i in names(labels)) {
     cat('### Raw means\n')
     cellmeans<-MPA_rawMeans(dat)
     cm[[i]] <- cellmeans
-    cellmeans <- MPA_sector_levels4plotting(cellmeans)
+    cellmeans <- MPA_sector_levels4plotting(cellmeans) |> droplevels()
     p = MPA_RAPPlot(cellmeans, ytitle=labels[[i]], title=titles[[i]], stat='mean',purpose=purpose)
     MPA_SAVE_PLOTS(p, filename = paste0(fig_path, '/RAPPlot_',i,'_',sec,'_raw_design_influence'), PNG = FALSE)
     
@@ -173,6 +173,7 @@ for (i in names(labels)) {
     ## Reorder the levels such that a more data rich sector is the
     ## first level in order to stabalise models
     dat <- MPA_sector_levels4modelling(dat)
+    dat <- dat |> droplevels()
     
     ## Establish the model formula
     inla.form <- Y~Sector*cYear*Zone+
@@ -232,7 +233,7 @@ for (i in names(labels)) {
     cm.inla[[i]] <- cellmeans.inla
     cat('### INLA modelled means\n\n')
                                         #MPA_rawPlot(cellmeans.inla[[1]], ytitle=labels[[i]])
-    cellmeans.inla[[1]] <- MPA_sector_levels4plotting(cellmeans.inla[[1]])
+    cellmeans.inla[[1]] <- MPA_sector_levels4plotting(cellmeans.inla[[1]]) |> droplevels()
     cellmeans.inla[[1]] <- cellmeans.inla[[1]] %>% filter(Sector != 'Cooktown-Lizard') %>% droplevels()
     p=MPA_RAPPlot(cellmeans.inla[[1]], ytitle=labels[[i]], title=titles[[i]],purpose=purpose)
     ggsave(filename=paste0(modelled_data_path, '/RAPPlot_',i,'_',sec,'_inla_design_influence.pdf'), p,width=10, height=6)
