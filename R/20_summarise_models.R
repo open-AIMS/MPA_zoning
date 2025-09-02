@@ -1,7 +1,7 @@
 purpose <- 'Reports' #'Web' #'Reports'
 sector <- 'All' #'Cairns' #'All'
 PNG <- FALSE
-    
+
 library(dplyr)
 library(tidyr)
 library(reshape)
@@ -31,8 +31,8 @@ source('helperFunctions.R')
 purpose <- 'Reports' #'Web' #'Reports'
 sector <- 'All' #'Cairns' #'All'
 PNG <- TRUE
-MAX_REPORT_YEAR <- 2024
-report_year <- 2024
+MAX_REPORT_YEAR <- 2025
+report_year <- 2025
 sec <- "All"
 ## ----end
 
@@ -45,7 +45,7 @@ load(file = paste0(modelled_data_path, '/cm.all.RData'))
 load(file = paste0(modelled_data_path, '/cm.inla.RData'))
 load(file = paste0(processed_data_path, "/labels.RData"))
 
-for (i in names(labels)) {  
+for (i in names(labels)) {
     cellmeans.inla <- cm.inla[[i]]
     cellmeans.inla[[1]] <- MPA_sector_levels4plotting(cellmeans.inla[[1]])
     cellmeans.inla[[1]] <- cellmeans.inla[[1]] %>% filter(Sector != 'Cooktown-Lizard') %>% droplevels()
@@ -80,7 +80,7 @@ p <- cm.abund %>%
     theme(strip.placement = "outside",
           strip.background = element_blank(),
           strip.text.x = element_text(size = 12),
-          axis.title.y = element_blank()) 
+          axis.title.y = element_blank())
 ggsave(filename=paste0(fig_path, '/RAPPlot_effects_sector_inla.pdf'), p,width=10, height=10)
 ggsave(filename=paste0(fig_path, '/RAPPlot_effects_sector_inla.png'), p,width=10, height=10, dpi = 300)
 ggsave(filename=paste0(fig_path, '/RAPPlot_effects_sector_inla.jpg'), p,width=10, height=10, dpi = 300)
@@ -107,7 +107,7 @@ p <- cm.abund %>%
           strip.background = element_blank(),
           strip.text.x = element_text(size = 12),
           panel.spacing = unit(10, 'points'),
-          axis.title.y = element_blank()) 
+          axis.title.y = element_blank())
 ggsave(filename=paste0(fig_path, '/RAPPlot_effects_sector1_inla.pdf'), p,width=15, height=10)
 ggsave(filename=paste0(fig_path, '/RAPPlot_effects_sector1_inla.png'), p,width=15, height=10, dpi = 300)
 ggsave(filename=paste0(fig_path, '/RAPPlot_effects_sector1_inla.jpg'), p,width=15, height=10, dpi = 300)
@@ -139,7 +139,7 @@ cm.abund <- do.call('rbind', cm.larger[seq(1,length(cm.larger),by=3)]) %>% mutat
 
 levs = cm.abund %>% dplyr::select(Name,lev) %>% mutate(Name=factor(Name, levels=rev(alternative_group_names$Name))) %>% distinct
 g1 = cm.abund %>% ggplot() +
-    geom_hline(yintercept=0, linetype='dashed') + 
+    geom_hline(yintercept=0, linetype='dashed') +
     geom_pointrange(aes(y=Median, x=Name, ymin=lower.1, ymax=upper.1)) +
     geom_linerange(aes(y=Median, x=Name, ymin=lower, ymax=upper), size=1) +
     scale_y_continuous('Percent change (Open vs Closed)') +
@@ -150,7 +150,7 @@ g1 = cm.abund %>% ggplot() +
     theme(axis.text.y=element_markdown())
 g1
 gs2 = gs = ggplot() +
-    geom_blank(data=cm.abund, aes(y=NULL, x=Name)) +    
+    geom_blank(data=cm.abund, aes(y=NULL, x=Name)) +
     coord_flip() +
     ylim(0,1) +
     scale_x_discrete('', labels=cm.abund$Name) +
@@ -194,7 +194,7 @@ cm.length <- do.call('rbind', cm.larger[seq(2,length(cm.larger),by=3)])%>% mutat
     arrange(Name) %>%
     mutate(lev=as.numeric(Name))
 g2 <- cm.length %>% ggplot() +
-    geom_hline(yintercept=0, linetype='dashed') + 
+    geom_hline(yintercept=0, linetype='dashed') +
     geom_pointrange(aes(y=Median, x=Name, ymin=lower.1, ymax=upper.1)) +
     geom_linerange(aes(y=Median, x=Name, ymin=lower, ymax=upper), size=1) +
     scale_y_continuous('Percent change (Open vs Closed)') +
@@ -217,7 +217,7 @@ cm.biomass <- do.call('rbind', cm.larger[seq(3,length(cm.larger),by=3)])%>% muta
     arrange(Name) %>%
     mutate(lev=as.numeric(Name))
 g3 <- cm.biomass %>% ggplot() +
-    geom_hline(yintercept=0, linetype='dashed') + 
+    geom_hline(yintercept=0, linetype='dashed') +
     geom_pointrange(aes(y=Median, x=Name, ymin=lower.1, ymax=upper.1)) +
     geom_linerange(aes(y=Median, x=Name, ymin=lower, ymax=upper), size=1) +
     scale_y_continuous('Percent change (Open vs Closed)') +

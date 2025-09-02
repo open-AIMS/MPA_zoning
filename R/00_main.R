@@ -34,6 +34,7 @@
 ## ---- libraries
 library(dplyr)
 library(tidyr)
+library(readr)
 library(reshape)
 library(nlme)
 library(data.table)
@@ -61,8 +62,8 @@ source('../R/helperFunctions.R')
 purpose <- 'Reports' #'Web' #'Reports'
 sector <- 'All' #'Cairns' #'All'
 PNG <- FALSE
-MAX_REPORT_YEAR <- 2024
-report_year <- 2024
+MAX_REPORT_YEAR <- 2025
+report_year <- 2025
 ## ----end
 
 ## ---- paths
@@ -118,7 +119,8 @@ benthos <- benthos %>% dplyr::filter(!is.na(RAP_REEF_PAIR))
 ## - create Biomass and Length groups for the various fish groups   ##
 ##    including Coral trout and Secondary targets                   ##
 ######################################################################
-if (purpose == 'Reports') fish <- MPA_group(fish)
+## if (purpose == 'Reports') fish <- MPA_group(fish)
+if (purpose == 'Reports') fish <- MPA_group_2025(fish)
 ##############################################################
 ## Assign modelling groups to the fish data for Web purpose ##
 ##############################################################
@@ -132,7 +134,7 @@ benthos <- MPA_benthosgroups(benthos)
 ## Aggregate the fish data to Transect level (should already be ##
 ## Transect level)                                              ##
 ##################################################################
-fish<-MPA_transectAgg(fish) 
+fish<-MPA_transectAgg(fish)
 
 ########################################################################
 ## Aggregate data to site level                                       ##
@@ -171,7 +173,7 @@ if (purpose=='Web' & sector!='All') {
 ## Define the y-axis labels (may want to put this in a parameters/ file ##
 ##########################################################################
 labels <- MPA_makeLabels(type = purpose)
-titles <- MPA_makeTitles(type = purpose) 
+titles <- MPA_makeTitles(type = purpose)
 
 save(labels, titles, file = paste0(processed_data_path, "/labels.RData"))
 save(data, file = paste0(processed_data_path, "/data.RData"))
@@ -179,5 +181,3 @@ load(file = paste0(processed_data_path, "/data.RData"))
 
 source("10_analysis.R")
 source("20_summarise_models.R")
-
-

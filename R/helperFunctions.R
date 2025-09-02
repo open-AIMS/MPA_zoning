@@ -207,6 +207,84 @@ MPA_cleanImport <- function(data,purpose) {
     data
 }
 
+MPA_group_2025 <- function(data) {
+  ## Add trophic group to the data based on a lookup table
+  ## As of May 2025, there is a new lookup.
+  ## Mike produced a file (dahsboard_fish_groups for murray.csv) which
+  ## I have renamed to dashboard_fish_groups.csv (it is the same one
+  ## that is used for the LTMP dashboard).
+  trophic_groups <- read_csv(paste0(params_path, "/dashboard_fish_groups.csv"))
+  lw_conv <- read.csv(paste0(params_path, "/L-W co-effs.csv"), header=T, sep=",", strip.white=T)
+  finer_groups <- read.csv(paste0(params_path, "/Murray_LTMPFish_Mar21.csv")) %>%
+    mutate(Species = gsub('\\.','_', FISH_CODE), Group=Groups)
+
+  groups <-
+    trophic_groups %>%
+    dplyr::filter(`Dashboard species list` == "restricted") |>
+    mutate(Trophic = Dashboard_trophic) |>
+    mutate(Trophic = ifelse(Trophic == "Carnivore" &
+                              !str_detect(FISH_CODE, "^PMS.*|^VAR.*"),
+      "Secondary targets", Trophic),
+      Trophic = ifelse(Trophic == "Carnivore" &
+                         str_detect(FISH_CODE, "^PMS.*|^VAR.*"),
+        "Coral Trout", Trophic),
+      Trophic = ifelse(Trophic == "Corallivore", "Corallivores", Trophic),
+      Trophic = ifelse(Trophic == "Omnivore", "Omnivores", Trophic)
+    ) |>
+    dplyr::select(FISH_CODE, Trophic) |>
+    dplyr::mutate(Group = Trophic)
+
+  richness <- data %>%
+    group_by(Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Species) %>%
+    summarize(SumOfABUNDANCE=sum(SumOfABUNDANCE,na.rm=TRUE)) %>%
+    ungroup() %>%
+    MPA_speciesRichness() %>%
+    mutate(Group='Species Richness', Value=Richness) %>%
+    dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value)
+
+  data1 <- data  # keep a pre copy so we can process Frederieke's groups
+
+  data <-
+    data %>%
+    mutate(Value=SumOfABUNDANCE) %>%
+    left_join(groups, by=c("FISH_CODE")) %>%
+    dplyr::filter(!is.na(Trophic)) %>%
+    MPA_calculateDensities() %>%
+    dplyr::select(-Area) %>%
+    split(.$Group)
+
+  ## For Coral Trout and Secondary targets, create additional LENGTH and BIOMASS items
+  data[['Coral Trout Biomass']] <- MPA_calculateBiomass(data[['Coral Trout']],lw_conv) %>%
+    mutate(Value=Biomass, Group='Coral Trout Biomass') %>% dplyr::select(-a,-b,-Biomass)
+  data[['Coral Trout Length']] <- data[['Coral Trout']] %>%
+    mutate(Value=LENGTH,Group='Coral Trout Length')
+  data[['Secondary targets Biomass']] <- MPA_calculateBiomass(data[['Secondary targets']],lw_conv) %>%
+    mutate(Value=Biomass, Group='Secondary targets Biomass') %>% dplyr::select(-a,-b,-Biomass)
+  data[['Secondary targets Length']] <- data[['Secondary targets']] %>%
+    mutate(Value=LENGTH,Group='Secondary targets Length')
+
+  ## For finer groups (for Frederieke)
+  data1 <- data1 %>% mutate(Value=SumOfABUNDANCE) %>%
+    left_join(finer_groups %>%
+                dplyr::select(Species, Group)) %>%
+    MPA_calculateDensities() %>% dplyr::select(-Area) %>%
+    split(.$Group)
+  for (i in names(data1)) {
+    nms <- paste(i, 'Biomass')
+    data1[[nms]] <- MPA_calculateBiomass(data1[[i]],lw_conv) %>%
+      mutate(Value=Biomass, Group=nms) %>% dplyr::select(-a,-b,-Biomass)
+    nms <- paste(i, 'Length')
+    data1[[nms]] <- data1[[i]] %>%
+      mutate(Value=LENGTH,Group=nms)
+  }
+  data1 <- do.call('rbind', data1) %>%
+    dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value)
+
+  do.call('rbind', data) %>%
+    dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value) %>%
+    bind_rows(richness) %>%
+    bind_rows(data1)
+}
 
 ## Standardize all so that the response is Value
 ## It is either:
@@ -219,7 +297,7 @@ MPA_group <- function(data) {
 
     finer_groups <- read.csv(paste0(params_path, "/Murray_LTMPFish_Mar21.csv")) %>%
         mutate(Species = gsub('\\.','_', FISH_CODE), Group=Groups)
-    
+
     groups$Species <- groups$Code
     groups$Group <- groups$Trophic
 
@@ -229,13 +307,13 @@ MPA_group <- function(data) {
       ungroup() %>%
         MPA_speciesRichness() %>%
         mutate(Group='Species Richness', Value=Richness) %>%
-        dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value) 
+        dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value)
     data1 <- data  # keep a pre copy so we can process Frederieke's groups
     data <- data %>% mutate(Value=SumOfABUNDANCE) %>%
         left_join(groups) %>%
         MPA_calculateDensities() %>% dplyr::select(-Area) %>%
         split(.$Group)
-    
+
     ## For Coral Trout and Secondary targets, create additional LENGTH and BIOMASS items
     data[['Coral Trout Biomass']] <- MPA_calculateBiomass(data[['Coral Trout']],lw_conv) %>%
         mutate(Value=Biomass, Group='Coral Trout Biomass') %>% dplyr::select(-a,-b,-Biomass)
@@ -260,8 +338,8 @@ MPA_group <- function(data) {
           mutate(Value=LENGTH,Group=nms)
         }
     data1 <- do.call('rbind', data1) %>%
-        dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value) 
-        
+        dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value)
+
     do.call('rbind', data) %>%
         dplyr::select(Group,Sector,SHELF,Pair,Zone,Reef,Site,Transect,Year,cYear,Value) %>%
         bind_rows(richness) %>%
@@ -356,7 +434,7 @@ MPA_siteAgg <- function(data) {
 
 
 MPA_makeLabels <- function(type='Reports') {
-    labels = list() 
+    labels = list()
     if (type=='Reports') {
         labels[['Coral Trout Biomass']] = expression(Trout~biomass~(kg~per~1000~m^2))
         labels[['Coral Trout']] = expression(Trout~(per~1000~m^2))
@@ -369,17 +447,20 @@ MPA_makeLabels <- function(type='Reports') {
         labels[['Farmers']] = expression(Farmers~(per~1000~m^2))
         labels[['Planktivores']] = expression(Planktivores~(per~1000~m^2))
         labels[['Detritivores']] = expression(Detritivores~(per~1000~m^2))
-        labels[['Benthic foragers']] = expression(Benthic~forager~(per~1000~m^2))
+        ## labels[['Benthic foragers']] = expression(Benthic~forager~(per~1000~m^2))
+        labels[['Browsers']] = expression(Browsers~(per~1000~m^2))
         labels[['Excavators']] = expression(Excavators~(per~1000~m^2))
-        labels[['Obligate corallivores']] = expression(Obligate~corallivores~(per~1000~m^2))
-        labels[['Omnivorous Pomacentridae']] = expression(Omnivorous~Pomacentridae~(per~1000~m^2))
-        
+        ## labels[['Obligate corallivores']] = expression(Obligate~corallivores~(per~1000~m^2))
+        labels[['Corallivores']] = expression(Corallivores~(per~1000~m^2))
+        ## labels[['Omnivorous Pomacentridae']] = expression(Omnivorous~Pomacentridae~(per~1000~m^2))
+        labels[['Omnivores']] = expression(Omnivores~(per~1000~m^2))
+
         labels[['Species Richness']] = expression(Species~Richness~(per~site))
-        
+
         labels[['A']] = expression(Algal~cover~('%'))
         labels[['HC']] = expression(Hard~coral~cover~('%'))
         labels[['SC']] = expression(Soft~coral~cover~('%'))
-        
+
         labels[['Labridae (Wrasses)']] = expression(Wrass~(per~1000~m^2))
         labels[['Labridae (Wrasses) Length']] = expression(Wrass~Length~(cm))
         labels[['Labridae (Wrasses) Biomass']] = expression(Wrass~biomass~(kg~per~1000~m^2))
@@ -413,7 +494,7 @@ MPA_makeLabels <- function(type='Reports') {
 }
 
 MPA_makeTitles <- function(type='Reports') {
-    titles = list() 
+    titles = list()
     if (type=='Reports') {
         titles[['Coral Trout Biomass']] = ''
         titles[['Coral Trout']] = ''
@@ -426,13 +507,16 @@ MPA_makeTitles <- function(type='Reports') {
         titles[['Farmers']] = ''
         titles[['Planktivores']] = ''
         titles[['Detritivores']] = ''
-        titles[['Benthic foragers']] = ''
+        ## titles[['Benthic foragers']] = ''
+        titles[['Browsers']] = ''
         titles[['Excavators']] = ''
-        titles[['Obligate corallivores']] = ''
-        titles[['Omnivorous Pomacentridae']] = ''
-        
+        ## titles[['Obligate corallivores']] = ''
+        titles[['Corallivores']] = ''
+        ## titles[['Omnivorous Pomacentridae']] = ''
+        titles[['Omnivores']] = ''
+
         titles[['Species Richness']] = ''
-        
+
         titles[['A']] = ''
         titles[['HC']] = ''
         titles[['SC']] = ''
@@ -442,21 +526,21 @@ MPA_makeTitles <- function(type='Reports') {
         titles[['Lutjanidae (Tropical Snappers) Biomass']] = ''
         titles[['Plectropomus and Variola spp (Coral trout) Biomass']] = ''
         titles[['Serranidae (Rockcods) Biomass']] = ''
-        
+
         titles[['Labridae (Wrasses) Length']] = ''
         titles[['Lethrinidae (Emperors) Length']] = ''
         titles[['Lethrinus miniatus and L. nebulosus (Redthroat and Spangled emperors) Length']] = ''
         titles[['Lutjanidae (Tropical Snappers) Length']] = ''
         titles[['Plectropomus and Variola spp (Coral trout) Length']] = ''
         titles[['Serranidae (Rockcods) Length']] = ''
-        
+
         titles[['Labridae (Wrasses)']] = ''
         titles[['Lethrinidae (Emperors) Length']] = ''
         titles[['Lethrinus miniatus and L. nebulosus (Redthroat and Spangled emperors)']] = ''
         titles[['Lutjanidae (Tropical Snappers)']] = ''
         titles[['Plectropomus and Variola spp (Coral trout)']] = ''
         titles[['Serranidae (Rockcods)']] = ''
-        
+
     } else {
         titles[['large']] = 'Large fish density from fixed site surveys'
         titles[['small']] = 'Small fish density from fixed site surveys'
@@ -486,14 +570,14 @@ MPA_rawMeans <- function(data) {
 MPA_RAPPlot <- function(dat, ytitle, title, stat='median', purpose='Web') {
     if (purpose=='Web') {
         if(stat=='mean') {
-            dat = dat %>% mutate(Value=Mean)  
+            dat = dat %>% mutate(Value=Mean)
         } else {
             dat = dat %>% mutate(Value=Median)
             #ytitle=substitute(ytitle,list(Mean=Median))
         }
         max.y1=max.y = max(dat$upper, na.rm=TRUE)*1.25
         if(any(all.vars(ytitle) == 'cover')) max.y1 = min(max(pretty(max.y1)),100)
-        
+
         p <-ggplot(dat, aes(y=Value, x=cYear, fill=Zone,color=Zone)) +
             geom_blank() + #aes(x=1,y=0))+
             geom_line(aes(x=as.numeric(cYear)),position=position_dodge(width=0.1))+
@@ -608,7 +692,7 @@ MPA_INLA_biomass <- function(data) {
         newdata.hg <- data %>% dplyr::select(Sector, cYear, Zone) %>% distinct()
         draws = sapply(draws, function(x) x[['latent']])
         xmat <- model.matrix(~Sector*cYear*Zone, data = newdata.hg)
-        fit = t(draws[n.i,]) %*% t(xmat) 
+        fit = t(draws[n.i,]) %*% t(xmat)
         ## fortify posteriors
         fit.hg <- newdata.hg %>% cbind(t(fit)) %>%
             pivot_longer(cols = c(-Sector,-cYear,-Zone), values_to = 'Fit') %>%
@@ -616,7 +700,7 @@ MPA_INLA_biomass <- function(data) {
             mutate(Fit = 1000*exp(Fit),
                    Iter = 1:n()) %>%
             dplyr::select(-name)
-        
+
         cellmeans <- fit.hg %>%
             full_join(data.mis) %>%
             mutate(Fit = ifelse(is.na(ValueMis), Fit, NA)) %>%
@@ -633,8 +717,8 @@ MPA_INLA_biomass <- function(data) {
             dplyr::select(-Zone) %>%
             summarise(across(everything(), diff)) %>%
             as.matrix()
-        
-        effects = t(draws[n.i,]) %*% t(newdata.hg1) 
+
+        effects = t(draws[n.i,]) %*% t(newdata.hg1)
         effects.95 <- 100*(HDInterval::hdi(exp(effects), credMass = 0.95)-1)[,1] %>%
             setNames(c('lower.1', 'upper.1'))
         effects.90 <- 100*(HDInterval::hdi(exp(effects), credMass = 0.90)-1)[,1] %>%
@@ -647,10 +731,10 @@ MPA_INLA_biomass <- function(data) {
             `X90.` = effects.90[2],
             `X97.5.` = effects.95[2],
             p.0 = sum(effects >0)/length(effects),
-            t(effects.90), 
+            t(effects.90),
             t(effects.95))
-        
-        
+
+
 ##         ## Start with binomial component
 ##         dat.inla.b <- inla(Value~Sector*cYear*Zone+
 ##                              f(Pair, model='iid') +
@@ -671,7 +755,7 @@ MPA_INLA_biomass <- function(data) {
 ##         newdata.b <- data %>% dplyr::select(Sector, cYear, Zone) %>% distinct()
 ##         draws = sapply(draws, function(x) x[['latent']])
 ##         xmat <- model.matrix(~Sector*cYear*Zone, data = newdata.b)
-##         fit = t(draws[n.i,]) %*% t(xmat) 
+##         fit = t(draws[n.i,]) %*% t(xmat)
 ##         ## fortify posteriors
 ##         fit.b <- newdata.b %>% cbind(t(fit)) %>%
 ##             pivot_longer(cols = c(-Sector,-cYear,-Zone), values_to = 'Fit.b') %>%
@@ -689,8 +773,8 @@ MPA_INLA_biomass <- function(data) {
 ##             dplyr::select(-Zone) %>%
 ##             summarise(across(everything(), diff)) %>%
 ##             as.matrix()
-##         fit.effects.b = t(draws[n.i,]) %*% t(xmat.effects) 
-        
+##         fit.effects.b = t(draws[n.i,]) %*% t(xmat.effects)
+
 ##         ## Now the gamma
 ##         dat.g <- data %>%
 ##             dplyr:::select(Value,Sector,cYear,Zone,Pair,Reef,Site) %>%
@@ -718,7 +802,7 @@ MPA_INLA_biomass <- function(data) {
 ##         newdata.g <- data %>% dplyr::select(Sector, cYear, Zone) %>% distinct()
 ##         draws = sapply(draws, function(x) x[['latent']])
 ##         xmat <- model.matrix(~Sector*cYear*Zone, data = newdata.g)
-##         fit = t(draws[n.i,]) %*% t(xmat) 
+##         fit = t(draws[n.i,]) %*% t(xmat)
 ##         ## fortify posteriors
 ##         fit.g <- newdata.g %>% cbind(t(fit)) %>%
 ##             pivot_longer(cols = c(-Sector,-cYear,-Zone), values_to = 'Fit.g') %>%
@@ -737,7 +821,7 @@ MPA_INLA_biomass <- function(data) {
 ##             summarise(across(everything(), diff)) %>%
 ##             as.matrix()
 ##         apply(draws[n.i,],1,mean)[1:7]
-##         fit.effects.g = t(draws[n.i,]) %*% t(xmat.effects) 
+##         fit.effects.g = t(draws[n.i,]) %*% t(xmat.effects)
 ##         apply(draws[n.i,],1,mean)[1:12]
 ##         fit.effects.g %>% head
 ##         mean(fit.effects.g)
@@ -770,7 +854,7 @@ MPA_INLA_biomass <- function(data) {
 ##         combine.effects <- data.frame(Eff.b = plogis(fit.effects.b),
 ##                                       Eff.g = exp(fit.effects.g)) %>%
 ##             mutate(Eff = exp(log(Eff.b) + log(Eff.g)))
-            
+
 
 ##         combine.effects %>% head
 ##         ## cellmeans %>%
@@ -784,9 +868,9 @@ MPA_INLA_biomass <- function(data) {
 ##         ##     ungroup() %>%
 ##         ##     group_by(Iter) %>%
 ##         ##     summarise(mean(Diff))
-        
+
     }
-   list(model = dat.inla.hg, newdata = newdata, n.2 = n.2, cellmeans = cellmeans, effects = effects) 
+   list(model = dat.inla.hg, newdata = newdata, n.2 = n.2, cellmeans = cellmeans, effects = effects)
 }
 
 MPA_INLA_biomass_old <- function(data) {
@@ -867,7 +951,7 @@ MPA_INLA_biomass_old <- function(data) {
         a <- inla.posterior.sample(1000, dat.inla.g)
         aa = sapply(a, function(x) x[['latent']])
         xmat <- model.matrix(~Sector*cYear*Zone, data = newdata)
-        fit = t(aa[1942:2139,]) %*% t(xmat) 
+        fit = t(aa[1942:2139,]) %*% t(xmat)
         g <- newdata %>% dplyr::select(-Value,-Pair,-Reef,-Site) %>%
             bind_cols(exp(aa[n.2,])) %>%
             pivot_longer(cols = c(-Sector,-cYear,-Zone), values_to = 'Fit.g') %>%
@@ -884,7 +968,7 @@ MPA_INLA_biomass_old <- function(data) {
         ##     unnest(cols=c(Fit.g)) %>%
         ##     mutate(Iter=1:n(), Fit.g=exp(Fit.g)) %>%
         ##     ungroup()
-        g   
+        g
         ## Combine together
         comb <- b %>%
             full_join(g) %>%
@@ -896,7 +980,7 @@ MPA_INLA_biomass_old <- function(data) {
             mutate(Fit = ifelse(is.na(ValueMis), Fit, NA)) %>%
             dplyr::select(-ValueMis)
     }
-   cellmeans 
+   cellmeans
 }
 
 MPA_INLA_cellmeans <- function(mod.cm) {
@@ -984,18 +1068,18 @@ MPA_inla <- function(data,   # the full data (used to get prediction levels)
                      inla.form, # the model formula
                      fam='nbinomial', # the family
                      link='log') {    # the link function
-   
+
     if (grepl('(beta)',fam)) {
         data.mod = data.mod %>% mutate(Value=Value/100)
-        Y = data.mod %>% pull(Value) 
+        Y = data.mod %>% pull(Value)
     }
     if (grepl('(beta|^gamma)',fam)) {
         data.mod = data.mod %>% mutate(Value=ifelse(Value==0,0.01,Value))
-        Y = data.mod %>% pull(Value) 
+        Y = data.mod %>% pull(Value)
     }
     if (grepl('(beta)',fam)) {
         data.mod = data.mod %>% mutate(Value=ifelse(Value==1,0.99,Value))
-        Y = data.mod %>% pull(Value) 
+        Y = data.mod %>% pull(Value)
     }
 
     n.1 = 1:nrow(data.mod) # indices of data
@@ -1028,7 +1112,7 @@ MPA_inla <- function(data,   # the full data (used to get prediction levels)
                      ## control.family=list(link=link),
                      control.predictor = list(compute=TRUE, link=1),
                      control.compute = list(config = TRUE, return.marginals.predictor = TRUE))
-    list(dat.inla = dat.inla, newdata = newdata, n.2 = n.2)    
+    list(dat.inla = dat.inla, newdata = newdata, n.2 = n.2)
 }
 
 MPA_inla_old <- function(data,fam='nbinomial',link='log') {
@@ -1106,13 +1190,14 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
         if (model[[1]]$all.hyper$family[[1]]$label=='tweedie') inv.link=model[[1]]$all.hyper$family[[1]]$hyper$theta2$from.theta
         if (model[[1]]$all.hyper$family[[1]]$label=='zeroinflatednbinomial1') inv.link=model[[1]]$all.hyper$family[[1]]$hyper$theta1$from.theta
         if (model[[1]]$all.hyper$family[[1]]$label=='nbinomial') inv.link=model[[1]]$all.hyper$family[[1]]$hyper$theta$from.theta
+        if (model[[1]]$all.hyper$family[[1]]$label=='nbinomial2') inv.link=model[[1]]$all.hyper$family[[1]]$hyper$theta$from.theta
         if (model[[1]]$all.hyper$family[[1]]$label=='gamma') inv.link=model[[1]]$all.hyper$family[[1]]$hyper$theta$from.theta
                                         #if (model[[1]]$all.hyper$family[[1]]$label=='zeroinflatedbinomial1') {inv.link=model[[1]]$all.hyper$family[[1]]$hyper$theta$from.theta; mult=100;}
         if (model[[1]]$all.hyper$family[[1]]$label=='binomial') {inv.link=binomial()$linkinv; mult=100;}
         if (model[[1]]$all.hyper$family[[1]]$label=='beta') {inv.link=binomial()$linkinv; mult=100;}
                                         #if (model[[1]]$all.hyper$family[[1]]$label=='betabinomial') {inv.link=binomial()$linkinv; mult=100;}
     }
-    
+
     cellmeans$mean=inv.link(cellmeans$mean) * mult
     cellmeans$Median=inv.link(cellmeans[,'0.5quant']) * mult
     cellmeans$lower = inv.link(cellmeans[,'0.025quant']) * mult
@@ -1125,12 +1210,12 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
         tidyr::expand(Sector,cYear,Zone) %>%
         anti_join(dat) %>%
         mutate(ValueMis = 1)
-    cellmeans <- cellmeans %>% 
+    cellmeans <- cellmeans %>%
         full_join(data.mis) %>%
         mutate(across(c(-Sector,-cYear,-Zone,-ValueMis),
                       function(x) ifelse(is.na(ValueMis), x, NA)))
     cellmeans_sector.year.zone <- cellmeans
-    
+
     draws <- inla.posterior.sample(1000, model[[1]])
     draws.attr <- attr(draws, ".content")
     wch <- which(draws.attr$tag == "(Intercept)")
@@ -1139,7 +1224,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
 
     ## Percent Effects (Zone) for each Year/Sector
     newdata <- dat %>% dplyr::select(Sector, cYear, Zone) %>% distinct()
-    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata) 
+    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata)
     ndat <- newdata %>% cbind(xmat) %>%
         group_by(Sector, cYear, Zone) %>%
         summarise(across(everything(),
@@ -1151,7 +1236,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
         summarise(across(everything(), diff)) %>%
         ungroup()
     xmat.e <- ndat %>%
-        dplyr::select(-Sector, -cYear) %>% 
+        dplyr::select(-Sector, -cYear) %>%
         as.matrix()
     effects <- t(draws[n.i,]) %*% t(xmat.e) %>%
         perc() %>%
@@ -1170,10 +1255,10 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
         bind_cols(ndat %>% dplyr::select(Sector, cYear)) %>%
         dplyr::select(Sector,cYear, everything(), -variable)
     effects_sector.year = effects
-    
+
     ## Percent Effects (Zone) for each Sector
     newdata <- dat %>% dplyr::select(Sector, cYear, Zone) %>% distinct()
-    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata) 
+    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata)
     ndat <- newdata %>% cbind(xmat) %>%
         dplyr::select(-cYear) %>%
         group_by(Sector, Zone) %>%
@@ -1186,7 +1271,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
         summarise(across(everything(), diff)) %>%
         ungroup()
     xmat.e <- ndat %>%
-        dplyr::select(-Sector) %>% 
+        dplyr::select(-Sector) %>%
         as.matrix()
     effects <- t(draws[n.i,]) %*% t(xmat.e) %>%
         perc() %>%
@@ -1204,11 +1289,11 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
                        upper.1 = ~ HDInterval::hdi(.x, credMass = 0.95)[[2]]) %>%
         bind_cols(ndat %>% dplyr::select(Sector)) %>%
         dplyr::select(Sector, everything(), -variable)
-    effects_sector <- effects 
+    effects_sector <- effects
 
     ## Percent Effects (Zone) for each Year
     newdata <- dat %>% dplyr::select(Sector, cYear, Zone) %>% distinct()
-    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata) 
+    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata)
     ndat <- newdata %>% cbind(xmat) %>%
         dplyr::select(-Sector) %>%
         group_by(cYear, Zone) %>%
@@ -1221,7 +1306,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
         summarise(across(everything(), diff)) %>%
         ungroup()
     xmat.e <- ndat %>%
-        dplyr::select(-cYear) %>% 
+        dplyr::select(-cYear) %>%
         as.matrix()
     effects <- t(draws[n.i,]) %*% t(xmat.e) %>%
         perc() %>%
@@ -1239,13 +1324,13 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
                        upper.1 = ~ HDInterval::hdi(.x, credMass = 0.95)[[2]]) %>%
         bind_cols(ndat %>% dplyr::select(cYear)) %>%
         dplyr::select(cYear, everything(), -variable)
-    effects_year <- effects 
+    effects_year <- effects
 
     ## Percent Effects (Zone) overall
     newdata <- dat %>% dplyr::select(Sector, cYear, Zone) %>% distinct()
-    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata) 
+    xmat <- model.matrix(~Sector*cYear*Zone, data = newdata)
     ndat <- newdata %>% cbind(xmat) %>%
-        dplyr::select(-Sector,-cYear) %>% 
+        dplyr::select(-Sector,-cYear) %>%
         group_by(Zone) %>%
         summarise(across(everything(),
                          mean)) %>%
@@ -1281,7 +1366,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ## #nn=expand.grid(Sector=levels(dat$Sector),Year=levels(dat$Year))
     ## ndat.p = as.matrix((dd=(cbind(ndat.p,t(aa)) %>% arrange(Sector,cYear)))[,-1:-3])
     ## s1=ndat.p[seq(1,nrow(ndat.p),by=2),]; s2=ndat.p[seq(2,nrow(ndat.p),by=2),];
-    
+
     ## #ndat.p = cbind(dd[,1:3],plyr:::adply(100*(s1-s2)/s2, 1, function(x) {
     ## #    data.frame(Mean=mean(x),Median=median(x),t(quantile(x,p=c(0.025,0.975))),'p>0'=length(x[x>0])/length(x))
     ## #}))
@@ -1324,7 +1409,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ## ## cellmeans.sector = cbind(model[['newdata3']],
     ## ##     model[[1]]$summary.linear.predictor[model[['n.3']],]
     ## ##                          )
-    
+
     ## ##Sector effect sizes
     ## aa.sector = aa %*% t(Xmat)
     ## ndat.p.sector=expand.grid(Sector=levels(dat$Sector),Zone=levels(dat$Zone))
@@ -1334,7 +1419,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ##     data.frame(Mean=mean(x),Median=median(x,na.rm=TRUE),t(quantile(x,p=c(0.025,0.975),na.rm=TRUE)),'p>0'=length(x[x>0])/length(x))
     ## }))
 
-    
+
     ## ## ndat.sector=expand.grid(Sector=levels(dat$Sector),Zone=levels(dat$Zone))
     ## ## ndat.sector = cbind(ndat.sector,t(aa.sector)) %>% group_by(Sector) %>% do({
     ## ##     x=.
@@ -1344,7 +1429,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ## ## })  %>% dplyr:::rename(lower=X2.5., upper=X97.5.)
     ## ndat.sector=expand.grid(Sector=levels(dat$Sector),Zone=levels(dat$Zone))
     ## if (length(unique(ndat.sector$Sector))>1) Xmat = model.matrix(~-1+Sector:Zone, data=ndat.sector)
-    ## if (length(unique(ndat.sector$Sector))==1) Xmat = model.matrix(~-1+Zone, data=ndat.sector) 
+    ## if (length(unique(ndat.sector$Sector))==1) Xmat = model.matrix(~-1+Zone, data=ndat.sector)
     ## Xmat=as.matrix(cbind(ndat.sector,Xmat) %>% dplyr:::select(-Zone) %>% group_by(Sector) %>% do({
     ##     x=.
     ##     data.frame(x[1,-1]-x[2,-1])
@@ -1377,7 +1462,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ## s1=ndat.p.zone[seq(1,nrow(ndat.p.zone),by=2),]; s2=ndat.p.zone[seq(2,nrow(ndat.p.zone),by=2),];
     ## x=100*(s1-s2)/s2
     ## ndat.p.zone = data.frame(Mean=mean(x,na.rm=TRUE),Median=median(x,na.rm=TRUE),t(quantile(x,p=c(0.025,0.1,0.9,0.975),na.rm=TRUE)),'p>0'=length(x[x>0])/length(x))
-    
+
     ## ## ndat.zone=expand.grid(Zone=levels(dat$Zone))
     ## ## ndat.zone = cbind(ndat.zone,t(aa.zone)) %>% do({
     ## ##     x=.
@@ -1386,7 +1471,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ## ##                    'p>0'=length(xx[xx>0])/length(x))
     ## ## })  %>% dplyr:::rename(lower=X2.5., upper=X97.5.)
     ## ndat.zone=expand.grid(Zone=levels(dat$Zone))
-    ## Xmat = model.matrix(~-1+Zone, data=ndat.zone)    
+    ## Xmat = model.matrix(~-1+Zone, data=ndat.zone)
     ## Xmat=as.matrix(cbind(ndat.zone,Xmat) %>% dplyr:::select(-Zone) %>% do({
     ##     x=.
     ##     data.frame(x[1,]-x[2,])
@@ -1409,7 +1494,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ##                    )
     ##     })
     ##     )%>% dplyr:::rename(lower=X2.5., upper=X97.5.)
-    
+
     ## ## Zone by year effect sizes
     ## aa.zoneyear = aa %*% t(Xmat)
     ## ndat.p.zoneyear=expand.grid(cYear=levels(dat$cYear),Zone=levels(dat$Zone))
@@ -1419,10 +1504,10 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ## ndat.p.zoneyear = cbind(dd[,1:2] %>% dplyr::select(cYear) %>% distinct,plyr:::adply(100*(s1-s2)/s2, 1, function(x) {
     ##     data.frame(Mean=mean(x,na.rm=TRUE),Median=median(x,na.rm=TRUE),t(quantile(x,p=c(0.025,0.975),na.rm=TRUE)),'p>0'=length(x[x>0])/length(x))
     ## }))
-    
+
     ## ndat.zoneyear=expand.grid(cYear=levels(dat$cYear),Zone=levels(dat$Zone))
     ## if (length(unique(ndat.zoneyear$cYear))>1) Xmat = model.matrix(~-1+cYear:Zone, data=ndat.zoneyear)
-    ## if (length(unique(ndat.zoneyear$cYear))==1) Xmat = model.matrix(~-1+Zone, data=ndat.zoneyear) 
+    ## if (length(unique(ndat.zoneyear$cYear))==1) Xmat = model.matrix(~-1+Zone, data=ndat.zoneyear)
     ## Xmat=as.matrix(cbind(ndat.zoneyear,Xmat) %>% dplyr:::select(-Zone) %>% group_by(cYear) %>% do({
     ##     x=.
     ##     data.frame(x[1,-1]-x[2,-1])
@@ -1434,7 +1519,7 @@ MPA_inla.cellmeans <- function(dat,model,regs, mult=1) {
     ##     })
     ## ) %>% dplyr:::rename(lower=X2.5., upper=X97.5.)
 
-    
+
     ## list(cellmeans=cellmeans,ndat=ndat,ndat.p=ndat.p,
     ##      cellmeans.sector=cellmeans.sector, ndat.sector=ndat.sector,ndat.p.sector=ndat.p.sector,
     ##      cellmeans.zone=cellmeans.zone,ndat.zone=ndat.zone,ndat.p.zone=ndat.p.zone,
@@ -1477,7 +1562,7 @@ MPA_gam <- function(dat, family, link) {
     dat1 = dat1 %>% mutate(cYear=factor(cYear, levels=lv[c(2,1,3:length(lv))]))
     if (length(unique(dat1$Sector))>1) form = Value~Sector*cYear*Zone+s(Pair,bs='re') + s(Reef,bs='re') + s(Site,bs='re')
     if (length(unique(dat1$Sector))==1) form = Value~cYear*Zone+s(Pair,bs='re') + s(Reef,bs='re') + s(Site,bs='re')
-    
+
     mod = gam(form,
               data=dat1,
               family=family,
@@ -1493,7 +1578,7 @@ MPA_cellmeans_gam <- function(dat.gam) {
     coefs = coefs[-wch]
     vc = vcov(dat.gam)[-wch,-wch]
     data = dat.gam$model
-    
+
     ##Cellmeans
     dat <- expand.grid(Sector=levels(data$Sector), Zone=levels(data$Zone), cYear=levels(data$cYear))
     if (length(unique(dat$Sector))>1) dat <- cbind(dat, model.matrix(~Sector*cYear*Zone, data=dat))
@@ -1510,13 +1595,13 @@ MPA_cellmeans_gam <- function(dat.gam) {
                                    lower=invlink(fit-Q*SE),
                                    upper=invlink(fit+Q*SE)
                                    ) %>%
-        dplyr::select(Sector, Zone, Year=cYear, Median, lower, upper) 
+        dplyr::select(Sector, Zone, Year=cYear, Median, lower, upper)
     dat.cellmeans
     dat.cellmeans %>%
         ggplot(aes(y=Median, x=Year, color=Zone)) +
         geom_pointrange(aes(ymin=lower, ymax=upper)) +
         geom_line(aes(linetype=Zone, x=as.numeric(Year))) +
-        facet_grid(~Sector)   
+        facet_grid(~Sector)
 }
 
 
@@ -1527,7 +1612,7 @@ MPA_makePriors <- function(cellmeans, data, link='log') {
     #priors$intercept=c(mu=round(log(median(data$Value)),2), sd=round(log(sd(data$Value)),2))
     priors$intercept=c(round(link(median(data$Value, na.rm=TRUE)),2), abs(round(link(sd(data$Value,na.rm=TRUE)),2)))
     if (any(is.infinite(priors$intercept))) priors$intercept[1] <- 0
-    
+
     if (length(unique(data$Sector))>1) Xmat = model.matrix(~Sector*cYear*Zone, data=cellmeans)
     if (length(unique(data$Sector))==1) Xmat = model.matrix(~cYear*Zone, data=cellmeans)
     coefs = cellmeans$Mean
@@ -1540,7 +1625,7 @@ MPA_makePriors <- function(cellmeans, data, link='log') {
 
 
 MPA_stan <- function(dat, cellmeans,family='zero_inflated_negbinomial') {
-   
+
     if (grepl('*.link=logit.*',family)) {dat1 = dat %>% mutate(Value=Value/100)
     }else if (grepl('^Gamma.*',family)) {dat1 = dat %>% mutate(Value=Value)
     }else dat1 = dat %>% mutate(Value=as.integer(Value))
@@ -1582,7 +1667,7 @@ MPA_stan <- function(dat, cellmeans,family='zero_inflated_negbinomial') {
                        family='negbinomial', iter = 2000, warmup = 1000, thin=3, chains=3,
                        prior=prior)
     }
-    
+
     dat.stan
 }
 
@@ -1597,7 +1682,7 @@ MPA_cellmeans_stan <- function(dat.stan) {
     if (dat.stan$family$link=='log') cellmeans.mcmc<-exp(coefs %*% t(xmat))
     if (dat.stan$family$link=='logit') cellmeans.mcmc<-invlogit(coefs %*% t(xmat))*100
     if (dat.stan$family$link=='identity') cellmeans.mcmc<-coefs %*% t(xmat)
-    
+
     #if(trans=='exp') cellmeans.mcmc<-exp(coefs %*% t(xmat))
     #if(trans=='logit') cellmeans.mcmc<-invlogit(coefs %*% t(xmat))
     #if(trans=='gaussian') cellmeans.mcmc<-(coefs %*% t(xmat))
@@ -1605,10 +1690,10 @@ MPA_cellmeans_stan <- function(dat.stan) {
         data.frame(Median=median(x), HPDinterval(as.mcmc(x)),HPDinterval(as.mcmc(x),prob=0.50),
                    t(ci(x)))
     })
-    
+
     #aa<-plyr::ddply(dat,~Sector+cYear+Zone, plyr::numcolwise(mean))
     aa = dat %>% group_by(Sector,cYear,Zone) %>% summarize_if(is.numeric, mean) %>% as.data.frame
-    
+
     dat <- cbind(aa[,1:3],dat.cellmeans)
     if (length(unique(dat$Sector)) > 1) dat$Sector <- factor(dat$Sector, labels=c('Cairns','Townsville','Pompeys','Swains','Cap-Bunkers'))
     dat$dcYear <- as.Date(paste(dat$cYear,'-01-01',sep=''))#as.numeric(as.character(dat$cYear))
@@ -1623,7 +1708,7 @@ MPA_cellmeans_stan <- function(dat.stan) {
     ## Effects sizes
     co.effect <- plyr::adply(co.mcmc,2,function(x){data.frame(Mean=mean(x), HPDinterval(as.mcmc(x)),t(quantile(x,p=c(0.025,0.975))))})
     co.effect <- cbind(expand.grid(cYear=seq(min(year(dat$dcYear)),max(year(dat$dcYear)),by=2),Sector=c("CAIN","TO","PO","SW","CB")), co.effect)
-    
+
     ## Means per Sector
     dat.s <- expand.grid(Sector=levels(data$Sector), Zone=levels(data$Zone), cYear=levels(data$cYear))
     if (length(unique(dat.s$Sector)) > 1) dat.s <- cbind(dat.s, model.matrix(~Sector*cYear*Zone, data=dat.s))
@@ -1648,7 +1733,7 @@ MPA_cellmeans_stan <- function(dat.stan) {
         co.mcmc.s <- sector.cellmeans.mcmc[,c(1,3,5,7,9)] - sector.cellmeans.mcmc[,c(2,4,6,8,10)]
         co.effect.s <- plyr::adply(co.mcmc.s,2,function(x){data.frame(Mean=mean(x), HPDinterval(as.mcmc(x)),t(quantile(x,p=c(0.025,0.975))))})
         co.effect.s <- cbind(expand.grid(Sector=c("CAIN","TO","PO","SW","CB")), co.effect.s)
-    
+
     ## Probabilities Closed higher than open per sector
     co.dat.s <- apply(co.mcmc.s,2,function(x) {
         length(x[x>0])/length(x)
@@ -1658,7 +1743,7 @@ MPA_cellmeans_stan <- function(dat.stan) {
         co.dat.s = NULL
         co.effect.s=NULL
     }
-    
+
     ## Overall closed higher than open probabilities
     co.mcmc1 <- as.vector(cellmeans.mcmc[,seq(1,ncol(cellmeans.mcmc),by=2)]) - as.vector(cellmeans.mcmc[,seq(2,ncol(cellmeans.mcmc),by=2)])
     co <- length(co.mcmc1[co.mcmc1>0])/length(co.mcmc1)
@@ -1721,7 +1806,7 @@ MPA_cellmeans_stan <- function(dat.stan) {
     co.effect.p.zy <- plyr::adply(co.mcmc.p.zy,2,function(x){data.frame(Mean=mean(x, na.rm=TRUE))})
     co.effect.p.zy <- cbind(expand.grid(cYear=levels(data$cYear)), co.effect.p.zy)
 
-    
+
     ## Probabilities Closed higher than open per year
     #co.dat.zy <- apply(co.mcmc.zy,2,function(x) {
     #    length(x[x>0])/length(x)
@@ -1764,7 +1849,7 @@ MPA_remove_combinations_without_fish <- function(dat) {
     dat1 = dat %>% left_join(regs %>% mutate(Exclude=1)) %>%
         filter(is.na(Exclude)) %>%
         dplyr::select(-Exclude) %>%
-        droplevels() %>% 
+        droplevels() %>%
         suppressMessages() %>%
         suppressWarnings()
     dat1

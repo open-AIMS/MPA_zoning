@@ -26,8 +26,8 @@ source('../R/helperFunctions.R')
 purpose <- 'Reports' #'Web' #'Reports'
 sector <- 'All' #'Cairns' #'All'
 PNG <- FALSE
-MAX_REPORT_YEAR <- 2024
-report_year <- 2024
+MAX_REPORT_YEAR <- 2025
+report_year <- 2025
 sec <- "All"
 ## ----end
 
@@ -47,19 +47,32 @@ names(cm) <- names(labels)
 cm.inla <- cm.all <- cm.all.year <- cm.gam <- cm
 model.settings <- read.table(file = paste0(params_path, "/model.settings.txt"),
                              header=TRUE,sep=',', strip.white=TRUE)
+## As of 2025, there is a need to modify the model.settings so as to
+## reflect species changes (that have induced group changes).
+## Although the below mappings of groups names are not exact, it
+## does not matter as they are just being used to specify what
+## model is to be used for which group.
+model.settings <-
+  model.settings |>
+  mutate(Group = ifelse(Group == "Benthic foragers", "Browsers", Group),
+    Group = ifelse(Group == "Omnivorous Pomacentridae", "Omnivores", Group),
+    Group = ifelse(Group == "Obligate corallivores", "Corallivores", Group)
+  ) |>
+  mutate(INLA.family = ifelse(Group == "Species Richness", "nbinomial", INLA.family))
+
 j <- 0
-for (i in names(labels)) {  
+for (i in names(labels)) {
     j<-j+1
     ms <- model.settings %>% filter(Group==i)
     dat <- data %>% filter(Group==i, Year <= MAX_REPORT_YEAR) |> droplevels()
-    cat(paste0('\n## ',i,'\n'))   
+    cat(paste0('\n## ',i,'\n'))
     cat('### Raw means\n')
     cellmeans<-MPA_rawMeans(dat)
     cm[[i]] <- cellmeans
     cellmeans <- MPA_sector_levels4plotting(cellmeans)
     p <- MPA_RAPPlot(cellmeans, ytitle=labels[[i]], title=titles[[i]], stat='mean',purpose=purpose)
     MPA_SAVE_PLOTS(p, filename = paste0(fig_path, "/RAPPlot_",i,'_',sec,'_raw'), PNG = FALSE)
-    
+
     cat('### Fit INLA model\n')
     ## Exclude Sector/Year/Zone combinations that have no fish (not
     ## surveyed)
@@ -68,13 +81,13 @@ for (i in names(labels)) {
     ## Reorder the levels such that a more data rich sector is the
     ## first level in order to stabalise models
     dat <- MPA_sector_levels4modelling(dat)
-    
+
     ## Establish the model formula
     inla.form <- Y~Sector*cYear*Zone+
         f(Pair, model='iid') +
         f(Reef, model='iid') +
         f(Site, model='iid')
-    ## Prepare the data according to the response type    
+    ## Prepare the data according to the response type
     if (grepl('.*Biomass', i)) {
         dat.g <- dat %>% filter(Value > 0)
         dat.c <- rbind(dat, dat.g)
@@ -132,7 +145,7 @@ for (i in names(labels)) {
     p<-MPA_RAPPlot(cellmeans.inla[[1]], ytitle=labels[[i]], title=titles[[i]],purpose=purpose)
     ggsave(filename<-paste0(fig_path, '/RAPPlot_',i,'_',sec,'_inla.pdf'), p,width=10, height=6)
 
-    cm.all[[i]] <- cellmeans.inla$effects_overall %>% 
+    cm.all[[i]] <- cellmeans.inla$effects_overall %>%
         mutate(Group=i)
 }
 
