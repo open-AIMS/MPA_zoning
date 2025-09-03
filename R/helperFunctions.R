@@ -54,7 +54,8 @@ paste0(primary_data_path, "/benthos.sql"))
 
         benthos <- read.csv(paste0(primary_data_path, "/benthos.csv"), strip.white=TRUE)
         benthos <- benthos %>%
-          filter(TRANSECT_NO!='6',!is.na(RAP_REEF_PAIR)) %>%
+          ## filter(TRANSECT_NO!='6',!is.na(RAP_REEF_PAIR)) %>%
+          filter(TRANSECT_NO!='6') %>%
             filter(REPORT_YEAR!=2017) # ARLINGTON REEF (OPEN) sampled in 2017, but should not be included in the analyses
         head(benthos)
         save(benthos, file = paste0(primary_data_path, "/benthos.RData"))
